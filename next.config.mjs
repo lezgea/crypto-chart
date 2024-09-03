@@ -2,7 +2,7 @@
 const nextConfig = {
     reactStrictMode: true,
     experimental: {
-        appDir: true, // For the App Router
+        // appDir: true, // For the App Router
     },
 };
 

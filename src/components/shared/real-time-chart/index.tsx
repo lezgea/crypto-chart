@@ -1,110 +1,168 @@
 "use client";
 
-import React from 'react';
-import { Line } from 'react-chartjs-2';
+import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { generateCandlestick } from '@utils/generateCandlestick';
-import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-} from 'chart.js';
+import { ApexOptions } from 'apexcharts';
 
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend
-)
+const ApexCharts = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface Candlestick {
-    open: number,
-    close: number,
-    high: number,
-    low: number,
-    time: string,
+    open: number;
+    close: number;
+    high: number;
+    low: number;
+    time: string;
+    isNew?: boolean;
 }
 
-const RealTimeChart = () => {
-    const [data, setData] = React.useState<Candlestick[]>([])
+const RealTimeChartComponent: React.FC = () => {
+    const [data, setData] = useState<Candlestick[]>([]);
+    const [increaseMode, setIncreaseMode] = useState<boolean>(false);
 
-    React.useEffect(() => {
-        setData((prevData) => [...prevData, generateCandlestick()])
+    useEffect(() => {
+        const initialData: Candlestick[] = [];
+        let previousClose = 100; // Starting price for the first candlestick
+        let initialTime = new Date();
+
+        for (let i = 0; i < 10; i++) {
+            const isIncreasing = Math.random() > 0.5; // Randomly decide if it's increasing
+            const candlestick = generateCandlestick(previousClose, isIncreasing);
+            candlestick.time = new Date(initialTime.getTime() + i * 60000).toISOString(); // Increase time by 1 minute for each candlestick
+            previousClose = candlestick.close; // Update the previous close for the next candlestick
+            initialData.push(candlestick);
+        }
+
+        setData(initialData); // Set the initial 10 candlesticks
 
         const interval = setInterval(() => {
             setData((prevData) => {
-                const newData = [...prevData, generateCandlestick()]
-                if (newData.length > 10) newData.shift()
+                const lastClose = prevData[prevData.length - 1]?.close || 100;
+                const newCandlestick = generateCandlestick(lastClose, increaseMode, true);
+                const lastTime = new Date(prevData[prevData.length - 1]?.time).getTime();
+                newCandlestick.time = new Date(lastTime + 60000).toISOString(); // Increase time by 1 minute
+
+                const newData = [...prevData, newCandlestick];
+                if (newData.length > 10) newData.shift();
                 return newData;
-            })
+            });
         }, 10000);
 
-        return () => clearInterval(interval)
-    }, [])
+        return () => clearInterval(interval);
+    }, []);
 
-    const chartData = {
-        labels: data.map((candle) => candle.time),
-        datasets: [
-            {
-                label: ' ',
-                data: data.map((candle) => candle.close),
-                borderColor: '#fff',
-            },
-        ],
-    }
+    const handleTap = () => {
+        setIncreaseMode(true); // Set to increase mode on tap
+        setData((prevData) => {
+            const lastClose = prevData[prevData.length - 1]?.close || 100;
+            const newCandlestick = generateCandlestick(lastClose, true, true); // Force an upward candlestick
+            const lastTime = new Date(prevData[prevData.length - 1]?.time).getTime();
+            newCandlestick.time = new Date(lastTime + 60000).toISOString(); // Increase time by 1 minute
 
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            x: {
-                type: 'category' as const,
-                labels: data.map((candle) => candle.time),
-                ticks: {
-                    color: '#fff',
-                },
-                grid: {
-                    color: 'rgba(255,255,255,.3)',
-                },
-                title: {
-                    display: true,
-                    text: 'Time',
-                    color: '#fff',
-                    font: {
-                        size: 14,
-                    },
-                    padding: { top: 5 },
-                },
+            const newData = [...prevData, newCandlestick];
+            if (newData.length > 10) newData.shift();
+            return newData;
+        });
+
+        setTimeout(() => {
+            setIncreaseMode(false); // Reset after a period of time
+        }, 10000);
+    };
+
+    const series = [
+        {
+            data: data.map((candle) => ({
+                x: new Date(candle.time).getTime(),
+                y: [candle.open, candle.high, candle.low, candle.close],
+                fillColor: increaseMode || candle.isNew ? '#71B82A' : (candle.close > candle.open ? '#71B82A' : '#EC5231'),
+            })),
+        },
+    ];
+
+    const options: ApexOptions = {
+        chart: {
+            type: 'candlestick',
+            height: 350,
+            toolbar: {
+                show: false,
             },
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    color: '#fff',
+            events: {
+                click: handleTap,
+            },
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+                animateGradually: {
+                    enabled: true,
+                    delay: 150,
                 },
-                grid: {
-                    color: 'rgba(255,255,255,.3)',
-                },
-                title: {
-                    display: true,
-                    text: 'Price',
-                    color: '#fff',
-                    font: {
-                        size: 14,
-                    },
-                    padding: { bottom: 5 },
+                dynamicAnimation: {
+                    enabled: true,
+                    speed: 350,
                 },
             },
         },
-    }
+        xaxis: {
+            type: 'datetime',
+            labels: {
+                style: {
+                    colors: '#000',
+                },
+            },
+        },
+        yaxis: {
+            labels: {
+                style: {
+                    colors: '#000',
+                },
+                formatter: (value: number): string => {
+                    if (Number.isInteger(value)) {
+                        return value.toString(); // Convert integer to string
+                    } else {
+                        return parseFloat(value.toFixed(2)).toString(); // Convert float to string
+                    }
+                },
+            },
+            tooltip: {
+                enabled: true,
+            },
+        },
+        plotOptions: {
+            candlestick: {
+                colors: {
+                    upward: '#71B82A',
+                    downward: '#EC5231',
+                },
+            },
+        },
+        grid: {
+            borderColor: 'rgba(0, 0, 0, 0.1)',
+        },
+        tooltip: {
+            theme: 'dark', // Apply dark theme for tooltip
+            onDatasetHover: {
+                highlightDataSeries: true,
+            },
+            x: {
+                show: true,
+                format: 'dd MMM yyyy HH:mm',
+            },
+            y: {
+                formatter: (value) => `Price: ${value}`,
+            },
+            marker: {
+                show: true,
+                fillColors: ['#808080'], // Set marker color to gray
+            },
+        },
+    };
 
-    return <Line data={chartData} options={chartOptions} />
+    return (
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px' }} className="w-full h-[100vh]">
+            <ApexCharts options={options} series={series} type="candlestick" height={"100%"} />
+        </div>
+    );
 };
 
-export default RealTimeChart;
+export default RealTimeChartComponent;

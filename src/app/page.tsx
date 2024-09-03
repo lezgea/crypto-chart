@@ -1,5 +1,8 @@
-import RealTimeChart from "@components/shared/real-time-chart";
+import dynamic from 'next/dynamic';
 
+const RealTimeChart = dynamic(() => import('@components/shared/real-time-chart'), {
+  ssr: false,
+});
 
 export default function Home() {
   return (

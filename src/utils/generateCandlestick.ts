@@ -1,9 +1,28 @@
+export const generateCandlestick = (
+    previousClose: number,
+    isIncreasing: boolean,
+    isNew: boolean = false 
+) => {
+    const variation = (Math.random() - 0.5) * 20;
 
-export const generateCandlestick = () => {
-    const open = Math.random() * 100
-    const close = Math.random() * 100
-    const high = Math.max(open, close) + Math.random() * 10
-    const low = Math.min(open, close) - Math.random() * 10
+    let open, close;
+    if (isIncreasing) {
+        open = previousClose + Math.random() * 10;
+        close = open + Math.abs(variation);
+    } else {
+        open = previousClose - Math.random() * 10;
+        close = open - Math.abs(variation);
+    }
 
-    return { open, close, high, low, time: new Date().toLocaleTimeString() };
-}
+    const high = Math.max(open, close) + Math.random() * 10;
+    const low = Math.min(open, close) - Math.random() * 10;
+
+    return {
+        open,
+        close,
+        high,
+        low,
+        time: new Date().toISOString(),
+        isNew, 
+    };
+};
